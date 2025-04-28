@@ -28,6 +28,8 @@ const csv = require('csv-parser');
 const crypto = require('crypto');
 const WebsiteSetup = require('./models/Website');
 const LeadForm = require('./models/LeadForm');
+const Property = require('./models/Property');
+
 const JWT_SECRET = process.env.JWT_SECRET || "fjuyrhuhuehdkjidhjdjhdjh8r4"; // Use environment variables
 
 // Initialize app
@@ -3829,7 +3831,224 @@ app.get("/searchQuery", async (req, res) => {
   }
 });
 
+ //add primary details property 
+ app.post('/addProperty', async (req, res) => {
+  try {
+    const { vendorId, lookingFor, kindofProperty, kindofPropertyDetails } = req.body;
 
+    const newProperty = new Property({
+      vendorId,
+      lookingFor,
+      kindofProperty,
+      kindofPropertyDetails
+    });
+
+    // Save the new property
+    const savedProperty = await newProperty.save();
+
+    // Respond with the saved property details
+    res.json({
+      status: 'ok',
+      message: 'Property added successfully',
+      _id: savedProperty._id  // Send the property ID (_id)
+    });
+  } catch (error) {
+    console.error('Error adding property:', error);
+    res.status(500).json({ status: 'error', message: 'Internal Server Error' });
+  }
+});
+//update location details
+app.put('/updatePropertyLocation', async (req, res) => {
+  try {
+    const { propertyId, city, locality } = req.body;
+
+    // Check if all required data is provided
+    if (!propertyId || !city || !locality) {
+      return res.status(400).json({ status: 'error', message: 'Missing required fields.' });
+    }
+
+    // Find property by ID and update the location details
+    const updatedProperty = await Property.findByIdAndUpdate(
+      propertyId,
+      { city, locality },
+      { new: true } // Return the updated property
+    );
+
+    if (!updatedProperty) {
+      return res.status(404).json({ status: 'error', message: 'Property not found.' });
+    }
+
+    // Return success message and updated property data
+    res.json({
+      status: 'ok',
+      message: 'Location details updated successfully!',
+      data: updatedProperty
+    });
+  } catch (error) {
+    console.error('Error updating property location:', error);
+    res.status(500).json({ status: 'error', message: 'Internal Server Error' });
+  }
+});
+app.put('/updatePropertyprofile', async (req, res) => {
+  try {
+    const { propertyId, bedrooms, bathrooms, balconies, carpetArea, buildUpArea, superBuildUpArea, propertyFloor, FloorNumber, availabilityStatus, ageOfProperty } = req.body;
+
+    // Find property by ID and update the property details
+    const updatedProperty = await Property.findByIdAndUpdate(
+      propertyId,
+      {
+        bedrooms,
+        bathrooms,
+        balconies,
+        carpetArea,
+        buildUpArea,
+        superBuildUpArea,
+        propertyFloor,
+        FloorNumber,
+        availabilityStatus,
+        ageOfProperty,
+      },
+      { new: true } // Return the updated property
+    );
+
+    if (!updatedProperty) {
+      return res.status(404).json({ status: 'error', message: 'Property not found.' });
+    }
+
+    // Return success message and updated property data
+    res.json({
+      status: 'ok',
+      message: 'Profile details updated successfully!',
+      data: updatedProperty,
+    });
+  } catch (error) {
+    console.error('Error updating property:', error);
+    res.status(500).json({ status: 'error', message: 'Internal Server Error' });
+  }
+});
+app.put('/updatePropertyImageVideo', upload.fields([
+  { name: 'PropertyImages', maxCount: 20 },
+  { name: 'propertyVideo', maxCount: 1 }
+]), async (req, res) => {
+  try {
+    const { propertyId } = req.body;
+
+    if (!propertyId) {
+      return res.status(400).json({ status: 'error', message: 'Property ID is required' });
+    }
+
+    const files = req.files;
+    let propertyVideoUrl = '';
+    let propertyImageUrls = [];
+
+    if (files['propertyVideo'] && files['propertyVideo'][0]) {
+      // You can upload this file to cloud storage or save the buffer
+      // For now, let's assume you save file buffer or make a fake URL
+      propertyVideoUrl = `uploads/${files['propertyVideo'][0].originalname}`;
+    }
+
+    if (files['PropertyImages']) {
+      propertyImageUrls = files['PropertyImages'].map(file => {
+        // Use the file's actual name from the `uploads` folder including the prefix
+        return `uploads/${file.filename}`; // The filename here includes the timestamp prefix
+      });
+    }
+
+    const updateData = {};
+
+    if (propertyVideoUrl) updateData.propertyVideo = propertyVideoUrl;
+    if (propertyImageUrls.length > 0) updateData.PropertyImages = propertyImageUrls;
+
+    const updatedProperty = await Property.findByIdAndUpdate(
+      propertyId,
+      updateData,
+      { new: true }
+    );
+
+    if (!updatedProperty) {
+      return res.status(404).json({ status: 'error', message: 'Property not found.' });
+    }
+
+    res.json({
+      status: 'ok',
+      message: 'Image and video details updated successfully!',
+      data: updatedProperty,
+    });
+  } catch (error) {
+    console.error('Error updating property:', error);
+    res.status(500).json({ status: 'error', message: 'Internal Server Error' });
+  }
+});
+
+app.put('/updatePropertyprice', async (req, res) => {
+  try {
+    const {
+      propertyId,
+      expectedPrice,
+      allInclusive,
+      taxExcluded,
+      priceNegotiable,
+      maintenance,
+      expectedRental,
+      bookingAmount,
+      annualDues,
+      maintancewish,
+      aboutproperty
+    } = req.body;
+
+    if (!propertyId) {
+      return res.status(400).json({ status: 'error', message: 'Property ID is required.' });
+    }
+
+    // Find the property by ID and update
+    const updatedProperty = await Property.findByIdAndUpdate(
+      propertyId,
+      {
+        expectedPrice,
+        allInclusive,
+        taxExcluded,
+        priceNegotiable,
+        maintenance,
+        expectedRental,
+        bookingAmount,
+        annualDues,
+        maintancewish,
+        aboutproperty
+      },
+      { new: true } // Return the updated document
+    );
+
+    if (!updatedProperty) {
+      return res.status(404).json({ status: 'error', message: 'Property not found.' });
+    }
+
+    res.json({
+      status: 'ok',
+      message: 'Price details updated successfully!',
+      data: updatedProperty
+    });
+  } catch (error) {
+    console.error('Error updating property:', error);
+    res.status(500).json({ status: 'error', message: 'Internal Server Error' });
+  }
+});
+//get property
+
+app.get('/getProperty/:id', async (req, res) => {
+  try {
+    const propertyId = req.params.id;
+    const property = await Property.findById(propertyId);
+
+    if (!property) {
+      return res.status(404).json({ status: 'error', message: 'Property not found' });
+    }
+
+    res.status(200).json({ status: 'ok', property });
+  } catch (error) {
+    console.error('Error fetching property:', error);
+    res.status(500).json({ status: 'error', message: 'Server Error' });
+  }
+});
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
