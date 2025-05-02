@@ -29,6 +29,8 @@ const crypto = require('crypto');
 const WebsiteSetup = require('./models/Website');
 const LeadForm = require('./models/LeadForm');
 const Property = require('./models/Property');
+const BusinessSetting = require('./models/Business');
+const PropertyEnquiry =require('./models/PropertyEnquiry');
 
 const JWT_SECRET = process.env.JWT_SECRET || "fjuyrhuhuehdkjidhjdjhdjh8r4"; // Use environment variables
 
@@ -3891,7 +3893,7 @@ app.put('/updatePropertyLocation', async (req, res) => {
 });
 app.put('/updatePropertyprofile', async (req, res) => {
   try {
-    const { propertyId, bedrooms, bathrooms, balconies, carpetArea, buildUpArea, superBuildUpArea, propertyFloor, FloorNumber, availabilityStatus, ageOfProperty } = req.body;
+    const { propertyId, bedrooms, bathrooms, balconies, carpetArea, buildUpArea, superBuildUpArea, propertyFloor,otherRooms, FloorNumber,Propertyfacing,PropertyNearby, availabilityStatus, ageOfProperty } = req.body;
 
     // Find property by ID and update the property details
     const updatedProperty = await Property.findByIdAndUpdate(
@@ -3904,7 +3906,10 @@ app.put('/updatePropertyprofile', async (req, res) => {
         buildUpArea,
         superBuildUpArea,
         propertyFloor,
+        otherRooms,
         FloorNumber,
+        Propertyfacing,
+        PropertyNearby,
         availabilityStatus,
         ageOfProperty,
       },
@@ -3942,20 +3947,17 @@ app.put('/updatePropertyImageVideo', upload.fields([
     let propertyImageUrls = [];
 
     if (files['propertyVideo'] && files['propertyVideo'][0]) {
-      // You can upload this file to cloud storage or save the buffer
-      // For now, let's assume you save file buffer or make a fake URL
-      propertyVideoUrl = `uploads/${files['propertyVideo'][0].originalname}`;
+      // Use the saved filename instead of originalname
+      propertyVideoUrl = `uploads/${files['propertyVideo'][0].filename}`;
     }
 
     if (files['PropertyImages']) {
       propertyImageUrls = files['PropertyImages'].map(file => {
-        // Use the file's actual name from the `uploads` folder including the prefix
-        return `uploads/${file.filename}`; // The filename here includes the timestamp prefix
+        return `uploads/${file.filename}`;
       });
     }
 
     const updateData = {};
-
     if (propertyVideoUrl) updateData.propertyVideo = propertyVideoUrl;
     if (propertyImageUrls.length > 0) updateData.PropertyImages = propertyImageUrls;
 
@@ -3980,11 +3982,13 @@ app.put('/updatePropertyImageVideo', upload.fields([
   }
 });
 
+
 app.put('/updatePropertyprice', async (req, res) => {
   try {
     const {
       propertyId,
       expectedPrice,
+      pricePersqft,
       allInclusive,
       taxExcluded,
       priceNegotiable,
@@ -4005,6 +4009,7 @@ app.put('/updatePropertyprice', async (req, res) => {
       propertyId,
       {
         expectedPrice,
+        pricePersqft,
         allInclusive,
         taxExcluded,
         priceNegotiable,
@@ -4049,6 +4054,357 @@ app.get('/getProperty/:id', async (req, res) => {
     res.status(500).json({ status: 'error', message: 'Server Error' });
   }
 });
+
+
+// ✅ Get otpEnable by ID
+app.get('/OTPenable/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    // Validate if ID is a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid ID format' });
+    }
+
+    const setting = await BusinessSetting.findById(id);
+    if (!setting) return res.status(404).json({ message: 'Not found' });
+    res.json(setting);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error fetching setting', error: err.message });
+  }
+});
+
+// ✅ Update otpEnable by ID
+app.put('/OTPenable/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    // Validate if ID is a valid MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid ID format' });
+    }
+
+    const updated = await BusinessSetting.findByIdAndUpdate(
+      id,
+      { otpEnable: req.body.otpEnable },
+      { new: true }
+    );
+
+    if (!updated) return res.status(404).json({ message: 'Not found' });
+    res.json(updated);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error updating setting', error: err.message });
+  }
+});
+
+//get Feacture property
+app.get('/getFeacturepropertyHome', async (req, res) => { 
+  try {
+    const products = await Property.aggregate([
+      {
+        $match: {
+          active: true,
+          feature: true,
+         
+        }
+      },
+      {
+        $lookup: {
+          from: 'vendor', // Ensure this matches your actual collection name
+          let: { vendorId: { $toObjectId: "$vendorId" } }, // Convert vendorId to ObjectId
+          pipeline: [
+            { $match: { $expr: { $eq: ["$_id", "$$vendorId"] } } }
+          ],
+          as: 'vendorDetails'
+        }
+      },
+      {
+        $unwind: {
+          path: '$vendorDetails',
+          preserveNullAndEmptyArrays: true // Keep products even if no vendor details exist
+        }
+      }
+    ]);
+
+    if (!products || products.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'No products found' });
+    }
+
+    res.json({ status: 'ok', data: products });
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    res.status(500).json({ status: 'error', message: 'Internal server error' });
+  }
+});
+app.get('/getProperty', async (req, res) => {
+  try {
+    const Products = await Property.find();
+    if (!Products) {
+      return res.status(404).send({ status: 'error', message: 'No Products found' });
+    }
+    res.send({ status: 'ok', data: Products });
+  } catch (error) {
+    console.error('Error fetching Products:', error);
+    res.status(500).send({ status: 'error', message: 'Internal server error' });
+  }
+  
+});
+
+//update property feature
+app.put('/updateFeatureProperty/:id', async (req, res) => {
+  const { id } = req.params;
+  const { feature } = req.body;
+
+  try {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).send({ status: 'error', message: 'Invalid Product ID format' });
+    }
+
+    const updatedProduct = await Property.findByIdAndUpdate(id, { feature }, { new: true });
+
+    if (!updatedProduct) {
+      return res.status(404).send({ status: 'error', message: 'Product not found' });
+    }
+
+    res.send({ status: 'ok', data: updatedProduct });
+  } catch (error) {
+    console.error('Error updating product:', error);
+    res.status(500).send({ status: 'error', message: 'Internal server error' });
+  }
+});
+//delete property
+
+app.delete('/deleteProperty', async (req, res) => {
+  const { productId } = req.body;
+
+  try {
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).send({ status: 'error', message: 'Invalid product ID format' });
+    }
+
+    const result = await Property.findByIdAndDelete(productId);
+    if (!result) {
+      return res.status(404).send({ status: 'error', message: 'Product not found' });
+    }
+
+    res.send({ status: 'ok', message: 'Product deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting product:', error);
+    res.status(500).send({ status: 'error', message: 'Internal server error' });
+  }
+});
+//get feature property
+app.get('/getFeactureProductsHome', async (req, res) => { 
+  try {
+    const products = await Property.aggregate([
+      {
+        $match: {
+          active: true,
+          feature: true,
+       
+        }
+      },
+      {
+        $lookup: {
+          from: 'vendor', // Ensure this matches your actual collection name
+          let: { vendorId: { $toObjectId: "$vendorId" } }, // Convert vendorId to ObjectId
+          pipeline: [
+            { $match: { $expr: { $eq: ["$_id", "$$vendorId"] } } }
+          ],
+          as: 'vendorDetails'
+        }
+      },
+      {
+        $unwind: {
+          path: '$vendorDetails',
+          preserveNullAndEmptyArrays: true // Keep products even if no vendor details exist
+        }
+      }
+    ]);
+
+    if (!products || products.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'No products found' });
+    }
+
+    res.json({ status: 'ok', data: products });
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    res.status(500).json({ status: 'error', message: 'Internal server error' });
+  }
+});
+//property view 
+
+app.get('/PropertyView/:id', async (req, res) => {
+  try {
+    const productId = req.params.id;
+
+    // Check for valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid property ID' });
+    }
+
+    const product = await Property.findById(productId)
+      .populate('vendorId'); // Assumes vendorId is a valid ref in your schema
+
+    if (product) {
+      res.json({ status: 'ok', data: product });
+    } else {
+      res.status(404).json({ status: 'error', message: 'Property not found' });
+    }
+  } catch (error) {
+    console.error('Error in /PropertyView/:id:', error); // Log full error
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+
+app.post("/BuilderData", async (req, res) => {
+  const { id } = req.body; // Extract id from request body
+  try {
+      const user = await Vendor.findOne({ _id: id });
+
+      if (!user) {
+          return res.status(404).send({ status: "error", message: "User not found" });
+      }
+
+      res.send({ status: "ok", data: user });
+  } catch (error) {
+      res.status(500).send({ status: "error", message: error.message });
+  }
+});
+app.post('/sendEnquiryProperty', async (req, res) => {
+  const {
+    customerId,
+    customername,
+    customerIdNumber,
+    customerEmail,
+    property_id,
+    ownerId,
+    ownerName,
+    ownerNumber
+  } = req.body;
+
+  console.log("Request Body:", req.body);
+
+  try {
+    // Check if the customer/vendor already exists by number or email
+    let existingVendor = await Vendor.findOne({
+      $or: [
+        { number: customerIdNumber },
+        { email: customerEmail }
+      ]
+    });
+
+    // If not exist, create a new Vendor record
+    if (!existingVendor) {
+      existingVendor = await Vendor.create({
+        fname: customername,
+        number: customerIdNumber,
+        email: customerEmail,
+        isBuilder: false,
+      });
+    }
+
+    // Ensure Vendor _id exists
+    if (!existingVendor || !existingVendor._id) {
+      throw new Error("Vendor ID not found or failed to create vendor.");
+    }
+
+    console.log("Existing or New Vendor ID:", existingVendor._id);
+
+    // Create the enquiry
+    const enquiry = await PropertyEnquiry.create({
+      customerId: existingVendor._id,
+      customername,
+      customerIdNumber,
+      property_id,
+      ownerId,
+      ownerName,
+      ownerNumber
+    });
+
+    res.send({ status: 'ok', message: 'Enquiry submitted successfully' });
+
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).send({ status: "error", message: error.message });
+  }
+});
+
+app.get('/allBuilder', async (req, res) => {
+  try {
+    console.log('Fetching all Vendors with isBuilder: true ...');
+
+    const vendors = await Vendor.find({ isBuilder: true });
+
+    console.log('Vendors fetched:', vendors);
+
+    if (vendors.length === 0) {
+      return res.status(404).send({ status: 'error', message: 'No builders found' });
+    }
+
+    res.send({ status: 'ok', data: vendors });
+  } catch (error) {
+    console.error('Error fetching vendors:', error);
+    res.status(500).send({ status: 'error', message: 'Internal server error' });
+  }
+});
+app.get('/allBuilderBuyer', async (req, res) => {
+  try {
+    console.log('Fetching all Vendors with isBuilder: true ...');
+
+    const vendors = await Vendor.find({ isBuilder: false });
+
+    console.log('Vendors fetched:', vendors);
+
+    if (vendors.length === 0) {
+      return res.status(404).send({ status: 'error', message: 'No builders found' });
+    }
+
+    res.send({ status: 'ok', data: vendors });
+  } catch (error) {
+    console.error('Error fetching vendors:', error);
+    res.status(500).send({ status: 'error', message: 'Internal server error' });
+  }
+});
+
+app.get('/getEnquiriesByVendor/:vendorId', async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+ 
+    const enquiries = await PropertyEnquiry.find({ ownerId: vendorId });
+
+    if (enquiries.length === 0) {
+      return res.status(200).send({ status: 'ok', data: [] });
+    }
+
+    res.send({ status: 'ok', data: enquiries });
+  } catch (error) {
+    console.error('Error fetching enquiries:', error);
+    res.status(500).send({ status: 'error', message: 'Internal server error' });
+  }
+});
+app.get('/getSentEnquiriesByBuyer/:BuyerId', async (req, res) => {
+  try {
+    const { BuyerId } = req.params;
+ 
+    const enquiries = await PropertyEnquiry.find({ customerId: BuyerId });
+
+    if (enquiries.length === 0) {
+      return res.status(200).send({ status: 'ok', data: [] });
+    }
+
+    res.send({ status: 'ok', data: enquiries });
+  } catch (error) {
+    console.error('Error fetching enquiries:', error);
+    res.status(500).send({ status: 'error', message: 'Internal server error' });
+  }
+});
+
+
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

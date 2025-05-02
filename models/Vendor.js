@@ -4,7 +4,8 @@ const slugify = require('slugify');
 const VendorSchema = new mongoose.Schema({
     fname: String,
     email: { type: String, unique: true },
-    number: String,
+    number: { type: String, unique: true },
+    isBuilder: Boolean,
     businessName: String,
     lname: String,
     alterEmail: String,
@@ -30,20 +31,6 @@ const VendorSchema = new mongoose.Schema({
     Pincode: String
 }, { timestamps: true, collection: 'vendor' });
 
-VendorSchema.pre('save', async function(next) {
-    if (this.isModified('businessName') || this.isNew) {
-        this.businessSlug = slugify(this.businessName, { lower: true, strict: true });
 
-        let existingVendor = await mongoose.model('Vendor').findOne({ businessSlug: this.businessSlug });
-        let slugModifier = 1;
-        
-        while (existingVendor) {
-            this.businessSlug = slugify(this.businessName, { lower: true, strict: true }) + '-' + slugModifier;
-            slugModifier++;
-            existingVendor = await mongoose.model('Vendor').findOne({ businessSlug: this.businessSlug });
-        }
-    }
-    next();
-});
 
 module.exports = mongoose.model('Vendor', VendorSchema);

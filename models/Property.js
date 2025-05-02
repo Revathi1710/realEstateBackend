@@ -17,10 +17,13 @@ const PropertySchema=new Schema({
     superBuildUpArea:{type:String},
     propertyFloor:{type:String},
     FloorNumber:{type:String},
+    otherRooms:[{type: String}],
     availabilityStatus:{type:String},
     ageOfProperty:{type:String},
     propertyVideo:{type:String},
     PropertyImages: [{ type: String }],
+    expectedPrice:{type:String},
+    pricePersqft:{type:String },
     allInclusive:{type:String},
       taxExcluded:{type:String},
       priceNegotiable:{type:String},
@@ -29,7 +32,11 @@ const PropertySchema=new Schema({
       bookingAmount:{type:String},
       annualDues:{type:String},
       maintancewish:{type:String},
-      aboutproperty:{type:String}
+      aboutproperty:{type:String },
+      Propertyfacing:{type:String},
+      PropertyNearby:[{type: String}],
+      active: { type: Boolean, default: true },
+      feature: { type: Boolean, default: false },
 
 }, { timestamps: true })
 module.exports = mongoose.model('Property', PropertySchema);

@@ -8,6 +8,7 @@ const EnquirySchema = new Schema({
     Username: { type: String, required: true },
     product_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
     vendorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', required: true },
+    customerId:{ type: mongoose.Schema.Types.ObjectId, ref: 'Vendor'},
     productPrice: { type: String, required: true },
     status: { type: String },
     starRate: { type: String },
