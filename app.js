@@ -1108,29 +1108,35 @@ app.post("/getVendorCategorycount", async (req, res) => {
   
 
  
+app.post('/getVendorEnquiry', async (req, res) => {
+  const { vendorId } = req.body;
+  console.log('Received vendorId:', vendorId);
 
-  app.post('/getVendorEnquiry', async (req, res) => {
-    const { vendorId } = req.body;
-  
-    try {
-      if (!mongoose.Types.ObjectId.isValid(vendorId)) {
-        return res.status(400).send({ status: 'error', message: 'Invalid vendor ID format' });
-      }
-  
-      const enquiries = await Enquiry.find({ vendorId })
-       .populate('product_id') // Populates product details
-      .populate('vendorId')  // Populates vendor details if needed
-      .exec();;
-      if (!enquiries || enquiries.length === 0) {
-        return res.status(404).send({ status: 'error', message: 'No enquiries found for this vendor' });
-      }
-  
-      res.send({ status: 'ok', data: enquiries });
-    } catch (error) {
-      console.error('Error fetching enquiries:', error);
-      res.status(500).send({ status: 'error', message: 'Internal server error' });
+  try {
+    if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+      console.log('Invalid vendor ID format');
+      return res.status(400).send({ status: 'error', message: 'Invalid vendor ID format' });
     }
-  });
+
+    const enquiries = await PropertyEnquiry.find({ ownerId: vendorId })
+      .populate('property_id')
+      .populate('ownerId')
+      .exec();
+
+    if (!enquiries || enquiries.length === 0) {
+      console.log('No enquiries found for this vendor');
+      return res.status(404).send({ status: 'error', message: 'No enquiries found for this vendor' });
+    }
+
+    console.log('Fetched enquiries:', enquiries.length);
+    res.send({ status: 'ok', data: enquiries });
+  } catch (error) {
+    console.error('Error fetching enquiries:', error);
+    res.status(500).send({ status: 'error', message: 'Internal server error' });
+  }
+});
+
+
   app.post('/getCustomerEnquiry', async (req, res) => {
     const { UserId } = req.body;
   
@@ -3836,13 +3842,14 @@ app.get("/searchQuery", async (req, res) => {
  //add primary details property 
  app.post('/addProperty', async (req, res) => {
   try {
-    const { vendorId, lookingFor, kindofProperty, kindofPropertyDetails } = req.body;
+    const { vendorId, lookingFor, kindofProperty, kindofPropertyDetails, categoryId } = req.body;
 
     const newProperty = new Property({
       vendorId,
       lookingFor,
       kindofProperty,
-      kindofPropertyDetails
+      kindofPropertyDetails,
+      categoryId // ✅ Add categoryId here
     });
 
     // Save the new property
@@ -3852,13 +3859,14 @@ app.get("/searchQuery", async (req, res) => {
     res.json({
       status: 'ok',
       message: 'Property added successfully',
-      _id: savedProperty._id  // Send the property ID (_id)
+      _id: savedProperty._id
     });
   } catch (error) {
     console.error('Error adding property:', error);
     res.status(500).json({ status: 'error', message: 'Internal Server Error' });
   }
 });
+
 //update location details
 app.put('/updatePropertyLocation', async (req, res) => {
   try {
@@ -4403,6 +4411,53 @@ app.get('/getSentEnquiriesByBuyer/:BuyerId', async (req, res) => {
   }
 });
 
+
+app.post("/getVendorProperty", async (req, res) => {
+  const { vendorId } = req.body;
+
+  try {
+    if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+      return res.status(400).send({ status: "error", message: "Invalid vendor ID format" });
+    }
+
+    const properties = await Property.find({ vendorId })
+      .populate({ path: "categoryId", select: "name" }) // ✅ Populate category name
+      .exec();
+
+    if (!properties.length) {
+      return res.status(404).send({ status: "error", message: "No properties found" });
+    }
+
+    res.send({ status: "ok", data: properties });
+  } catch (error) {
+    console.error("Error fetching properties:", error);
+    res.status(500).send({ status: "error", message: "Internal server error" });
+  }
+});
+
+app.post("/getVendorPropertycount", async (req, res) => {
+  const { vendorId } = req.body;
+
+  try {
+    // Validate vendorId
+    if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+      return res.status(400).send({ status: "error", message: "Invalid vendor ID format" });
+    }
+
+    // Count products
+    const productCount = await Property.countDocuments({ vendorId });
+
+    res.send({
+      status: "ok",
+      data: {
+        productCount,
+      },
+    });
+  } catch (error) {
+    console.error("Error counting products:", error);
+    res.status(500).send({ status: "error", message: "Internal server error" });
+  }
+});
 
 
 const PORT = process.env.PORT || 5000;

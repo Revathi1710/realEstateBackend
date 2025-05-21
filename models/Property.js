@@ -5,6 +5,7 @@ const Schema = mongoose.Schema;
 const PropertySchema=new Schema({
     vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor' },
     lookingFor:{type:String},
+    categoryId:{ type: Schema.Types.ObjectId, ref: 'Maincategory' },
     kindofProperty:{type:String},
     kindofPropertyDetails:{type:String},
     city:{type:String},
