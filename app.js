@@ -652,7 +652,7 @@ app.post("/getVendorProduct", async (req, res) => {
 });
 
 
-app.delete('/deleteProductVendor', async (req, res) => {
+app.delete('/deletePropertyVendor', async (req, res) => {
   const { productId } = req.body;
 
   try {
@@ -660,7 +660,7 @@ app.delete('/deleteProductVendor', async (req, res) => {
       return res.status(400).send({ status: 'error', message: 'Invalid product ID format' });
     }
 
-    const result = await Product.findByIdAndDelete(productId);
+    const result = await Property.findByIdAndDelete(productId);
     if (!result) {
       return res.status(404).send({ status: 'error', message: 'Product not found' });
     }
@@ -4458,8 +4458,209 @@ app.post("/getVendorPropertycount", async (req, res) => {
     res.status(500).send({ status: "error", message: "Internal server error" });
   }
 });
+app.post('/UpdateProperty/:id', async (req, res) => {
+  const { id } = req.params;
+  const { vendorId, lookingFor, kindofProperty, categoryId, kindofPropertyDetails } = req.body;
 
+  if (!vendorId || !lookingFor || !kindofProperty || !categoryId) {
+    return res.status(400).json({ status: 'error', message: 'Missing required fields' });
+  }
 
+  try {
+    const property = await Property.findById(id);
+
+    if (!property) {
+      return res.status(404).json({ status: 'error', message: 'Property not found' });
+    }
+
+    // Update property fields
+    property.vendorId = vendorId;
+    property.lookingFor = lookingFor;
+    property.kindofProperty = kindofProperty;
+    property.categoryId = categoryId;
+    property.kindofPropertyDetails = kindofPropertyDetails;
+
+    await property.save();
+
+    res.status(200).json({ status: 'ok', message: 'Property updated successfully', _id: property._id });
+  } catch (err) {
+    console.error('Update error:', err);
+    res.status(500).json({ status: 'error', message: 'Server error' });
+  }
+});
+// Express.js backend example
+app.post('/updatePropertyLocation/:id', async (req, res) => {
+  const { id } = req.params;
+  const { locality, city } = req.body;
+
+  try {
+    const updated = await Property.findByIdAndUpdate(id, {
+      locality,
+      city,
+    });
+
+    if (updated) {
+      res.json({ status: 'ok' });
+    } else {
+      res.json({ status: 'error', message: 'Property not found' });
+    }
+  } catch (err) {
+    console.error(err);
+    res.json({ status: 'error', message: 'Server error' });
+  }
+});
+
+app.post('/updatePropertyprofile/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const {
+      bedrooms,
+      bathrooms,
+      balconies,
+      carpetArea,
+      buildUpArea,
+      superBuildUpArea,
+      propertyFloor,
+      otherRooms,
+      FloorNumber,
+      Propertyfacing,
+      PropertyNearby,
+      availabilityStatus,
+      ageOfProperty,
+    } = req.body;
+
+    // Find property by ID and update details
+    const updatedProperty = await Property.findByIdAndUpdate(
+      id,
+      {
+        bedrooms,
+        bathrooms,
+        balconies,
+        carpetArea,
+        buildUpArea,
+        superBuildUpArea,
+        propertyFloor,
+        otherRooms,
+        FloorNumber,
+        Propertyfacing,
+        PropertyNearby,
+        availabilityStatus,
+        ageOfProperty,
+      },
+      { new: true } // Return the updated document
+    );
+
+    if (!updatedProperty) {
+      return res.status(404).json({ status: 'error', message: 'Property not found.' });
+    }
+
+    // Return success response
+    res.json({
+      status: 'ok',
+      message: 'Property profile updated successfully!',
+      data: updatedProperty,
+    });
+  } catch (error) {
+    console.error('Error updating property:', error);
+    res.status(500).json({ status: 'error', message: 'Internal Server Error' });
+  }
+});
+
+app.post('/updatePropertyMedia/:id', upload.fields([
+  { name: 'newImages', maxCount: 10 },
+  { name: 'propertyVideo', maxCount: 1 }
+]), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const newImages = req.files['newImages'] || [];
+    const newImagePaths = newImages.map(img => `/uploads/images/${img.filename}`);
+
+    const existingImages = req.body['existingImages[]']
+      ? Array.isArray(req.body['existingImages[]'])
+        ? req.body['existingImages[]']
+        : [req.body['existingImages[]']]
+      : [];
+
+    const allImages = [...existingImages, ...newImagePaths];
+
+    // Handle video
+    let videoPath = '';
+    if (req.files['propertyVideo'] && req.files['propertyVideo'][0]) {
+      videoPath = `/uploads/videos/${req.files['propertyVideo'][0].filename}`;
+    } else if (req.body.existingVideo) {
+      videoPath = req.body.existingVideo;
+    }
+
+    const updated = await Property.findByIdAndUpdate(id, {
+      PropertyImages: allImages,
+      propertyVideo: videoPath
+    }, { new: true });
+
+    if (!updated) {
+      return res.status(404).json({ status: 'error', message: 'Property not found' });
+    }
+
+    return res.json({ status: 'ok', property: updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ status: 'error', message: 'Server error' });
+  }
+});
+
+app.post('/updatePropertyprice/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const {
+      expectedPrice,
+        allInclusive,
+        taxExcluded,
+        priceNegotiable,
+        maintenance,
+        expectedRental,
+        pricePersqft,
+        bookingAmount,
+        annualDues,
+        maintancewish,
+        aboutproperty
+    } = req.body;
+
+    // Find property by ID and update details
+    const updatedProperty = await Property.findByIdAndUpdate(
+      id,
+      {
+         expectedPrice,
+        allInclusive,
+        taxExcluded,
+        priceNegotiable,
+        maintenance,
+        expectedRental,
+        pricePersqft,
+        bookingAmount,
+        annualDues,
+        maintancewish,
+        aboutproperty
+      },
+      { new: true } // Return the updated document
+    );
+
+    if (!updatedProperty) {
+      return res.status(404).json({ status: 'error', message: 'Property not found.' });
+    }
+
+    // Return success response
+    res.json({
+      status: 'ok',
+      message: 'Property profile updated successfully!',
+      data: updatedProperty,
+    });
+  } catch (error) {
+    console.error('Error updating property:', error);
+    res.status(500).json({ status: 'error', message: 'Internal Server Error' });
+  }
+});
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
