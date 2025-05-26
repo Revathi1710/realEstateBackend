@@ -2266,13 +2266,13 @@ app.get('/getProductsByCategory/:category', async (req, res) => {
     }
 
     // Build dynamic query object
-    const query = { category: categoryName };
+    const query = { categoryId: categoryName };
 
     if (propertyType) query.Typeofproperty = propertyType;
     if (bedrooms) query.noBedroom = parseInt(bedrooms); // Assuming bedrooms is stored as a number
     if (constructionStatus) query.ConstructionStatus = constructionStatus;
 
-    const products = await Product.find(query).populate('vendorId');
+    const products = await Property.find(query).populate('vendorId');
 
     if (products.length > 0) {
       res.json({ status: 'ok', data: products });
@@ -4065,11 +4065,10 @@ app.get('/getProperty/:id', async (req, res) => {
 
 
 // ✅ Get otpEnable by ID
+// GET business setting by ID
 app.get('/OTPenable/:id', async (req, res) => {
   try {
     const id = req.params.id;
-
-    // Validate if ID is a valid MongoDB ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
@@ -4083,22 +4082,23 @@ app.get('/OTPenable/:id', async (req, res) => {
   }
 });
 
-// ✅ Update otpEnable by ID
+// PUT to update otpEnable and/or NumberViewEnable
 app.put('/OTPenable/:id', async (req, res) => {
   try {
     const id = req.params.id;
-
-    // Validate if ID is a valid MongoDB ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
 
-    const updated = await BusinessSetting.findByIdAndUpdate(
-      id,
-      { otpEnable: req.body.otpEnable },
-      { new: true }
-    );
+    const updateData = {};
+    if (typeof req.body.otpEnable === 'boolean') {
+      updateData.otpEnable = req.body.otpEnable;
+    }
+    if (typeof req.body.NumberViewEnable === 'boolean') {
+      updateData.NumberViewEnable = req.body.NumberViewEnable;
+    }
 
+    const updated = await BusinessSetting.findByIdAndUpdate(id, updateData, { new: true });
     if (!updated) return res.status(404).json({ message: 'Not found' });
     res.json(updated);
   } catch (err) {
@@ -4661,6 +4661,33 @@ app.post('/updatePropertyprice/:id', async (req, res) => {
     res.status(500).json({ status: 'error', message: 'Internal Server Error' });
   }
 });
+
+// /api/properties/search
+app.get("/api/properties/search", async (req, res) => {
+  const { query, city, locality, propertyType } = req.query;
+
+  try {
+    const filters = {
+      $or: [
+        { city: { $regex: query, $options: "i" } },
+        { locality: { $regex: query, $options: "i" } },
+        { propertyType: { $regex: propertyType, $options: "i" } }
+      ],
+    };
+
+    const results = await Property.find(filters)
+      .populate("vendorId", "fname business_name vendorNumber")
+
+      .exec();
+
+    res.json(results);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

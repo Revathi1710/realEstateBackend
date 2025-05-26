@@ -4,6 +4,10 @@ const BusinessSettingSchema = new mongoose.Schema({
   otpEnable: {
     type: Boolean,
     default: false,
+  },
+  NumberViewEnable: {
+    type: Boolean,
+    default: false,
   }
 }, { timestamps: true });
 
