@@ -680,7 +680,7 @@ app.get('/GetproductVendor/:id', async (req, res) => {
       return res.status(400).send({ status: 'error', message: 'Invalid product ID format' });
     }
 
-    const product = await Product.findById(id);
+    const product = await Property.findById(id);
     if (!product) {
       return res.status(404).send({ status: 'error', message: 'Product not found' });
     }
@@ -1162,62 +1162,71 @@ app.post('/getVendorEnquiry', async (req, res) => {
     }
   });
   
-  app.get('/getAllEnquiry', async (req, res) => {   
-    try {
-        const enquiries = await Enquiry.aggregate([
-            {
-                $lookup: {
-                    from: 'vendor', // Ensure this is the correct collection name
-                    localField: 'vendorId',
-                    foreignField: '_id',
-                    as: 'vendorDetails'
-                }
-            },
-            {
-                $unwind: {
-                    path: '$vendorDetails',
-                    preserveNullAndEmptyArrays: true
-                }
-            },
-            {
-                $lookup: {
-                    from: 'products', // Ensure this is the correct collection name
-                    localField: 'product_id',
-                    foreignField: '_id',
-                    as: 'productDetails'
-                }
-            },
-            {
-                $unwind: {
-                    path: '$productDetails',
-                    preserveNullAndEmptyArrays: true
-                }
-            },
-            {
-                $project: {
-                    _id: 1,
-                    productname: '$productDetails.name',
-                    productPrice: '$productDetails.price',
-                    productImage: '$productDetails.image',
-                    UserNumber: 1,
-                    Username: 1, 
-                    createdAt:1,
-                    vendorName: '$vendorDetails.fname',
-                    vendorEmail: '$vendorDetails.email',
-                    vendorBusiness: '$vendorDetails.businessName'
-                }
-            }
-        ]);
-
-        if (!enquiries.length) {
-            return res.status(404).json({ status: 'error', message: 'No enquiries found' });
+app.get('/getAllEnquiry', async (req, res) => {   
+  try {
+    const enquiries = await PropertyEnquiry.aggregate([
+      {
+        $lookup: {
+          from: 'vendors',       // corrected collection name to plural & lowercase
+          localField: 'ownerId',
+          foreignField: '_id',
+          as: 'vendorDetails'
         }
+      },
+      {
+        $unwind: {
+          path: '$vendorDetails',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $lookup: {
+          from: 'properties',    // corrected collection name to plural & lowercase
+          localField: 'property_id',
+          foreignField: '_id',
+          as: 'propertyDetails'
+        }
+      },
+      {
+        $unwind: {
+          path: '$propertyDetails',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          propertyBedrooms: '$propertyDetails.bedrooms',
+          propertyBathrooms: '$propertyDetails.bathrooms',
+          PropertyImages: '$propertyDetails.PropertyImages',  // assuming this is an array
+          propertyBuildUpArea: '$propertyDetails.buildUpArea',
+          propertyPrice: '$propertyDetails.expectedPrice',
+          propertyLocality: '$propertyDetails.locality',
+          propertyCity: '$propertyDetails.city',
+          propertyNearby: '$propertyDetails.PropertyNearby',
+          propertyAbout: '$propertyDetails.aboutproperty',
 
-        res.json({ status: 'ok', data: enquiries });
-    } catch (error) {
-        console.error('Error fetching enquiries:', error);
-        res.status(500).json({ status: 'error', message: 'Internal server error' });
+          customerIdNumber: 1,
+         customername: 1, 
+         ownerName:1,
+         ownerNumber:1,
+          createdAt: 1,
+        
+        }
+      }
+    ]);
+
+    console.log('Enquiries fetched:', enquiries);  // Debug output
+
+    if (!enquiries.length) {
+      return res.status(404).json({ status: 'error', message: 'No enquiries found' });
     }
+
+    res.json({ status: 'ok', data: enquiries });
+  } catch (error) {
+    console.error('Error fetching enquiries:', error);
+    res.status(500).json({ status: 'error', message: 'Internal server error' });
+  }
 });
 
   
@@ -2259,18 +2268,38 @@ app.post('/AdminVendorEnquiry', async (req, res) => {
 app.get('/getProductsByCategory/:category', async (req, res) => {
   try {
     const categoryName = req.params.category;
-    const { propertyType, bedrooms, constructionStatus } = req.query;
+    const {
+      propertyType,
+      bedrooms,
+      constructionStatus,
+      minPrice,
+      maxPrice,
+      minArea,
+      maxArea
+    } = req.query;
 
     if (!categoryName) {
       return res.status(400).json({ status: 'error', message: 'Category name is missing' });
     }
 
-    // Build dynamic query object
+    // Build dynamic query
     const query = { categoryId: categoryName };
 
-    if (propertyType) query.Typeofproperty = propertyType;
-    if (bedrooms) query.noBedroom = parseInt(bedrooms); // Assuming bedrooms is stored as a number
+    if (propertyType) query.kindofPropertyDetails = propertyType;
+    if (bedrooms) query.bedrooms = parseInt(bedrooms);
     if (constructionStatus) query.ConstructionStatus = constructionStatus;
+
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.expectedPrice.$gte = parseInt(minPrice);
+      if (maxPrice) query.expectedPrice.$lte = parseInt(maxPrice);
+    }
+
+    if (minArea || maxArea) {
+      query.area = {};
+      if (minArea) query.buildUpArea.$gte = parseInt(minArea);
+      if (maxArea) query.buildUpArea.$lte = parseInt(maxArea);
+    }
 
     const products = await Property.find(query).populate('vendorId');
 
@@ -2280,10 +2309,10 @@ app.get('/getProductsByCategory/:category', async (req, res) => {
       res.status(404).json({ status: 'error', message: 'No products found with the specified filters' });
     }
   } catch (error) {
+    console.error('Error fetching products:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
 });
-
 
 
 
@@ -4381,19 +4410,22 @@ app.get('/allBuilderBuyer', async (req, res) => {
 app.get('/getEnquiriesByVendor/:vendorId', async (req, res) => {
   try {
     const { vendorId } = req.params;
- 
-    const enquiries = await PropertyEnquiry.find({ ownerId: vendorId });
 
-    if (enquiries.length === 0) {
-      return res.status(200).send({ status: 'ok', data: [] });
-    }
+    // Find all enquiries for the vendor and populate property info
+    const enquiries = await PropertyEnquiry.find({ ownerId: vendorId })
+      .populate({
+        path: "property_id",          // Field in PropertyEnquiry that refers to Property
+        model: "Property",            // The model you're populating from
+        select: "name city locality propertyType bedrooms bathrooms PropertyImages",  // Fields you want from Property
+      });
 
-    res.send({ status: 'ok', data: enquiries });
+    res.status(200).send({ status: 'ok', data: enquiries });
   } catch (error) {
     console.error('Error fetching enquiries:', error);
     res.status(500).send({ status: 'error', message: 'Internal server error' });
   }
 });
+
 app.get('/getSentEnquiriesByBuyer/:BuyerId', async (req, res) => {
   try {
     const { BuyerId } = req.params;
@@ -4662,28 +4694,147 @@ app.post('/updatePropertyprice/:id', async (req, res) => {
   }
 });
 
-// /api/properties/search
 app.get("/api/properties/search", async (req, res) => {
-  const { query, city, locality, propertyType } = req.query;
+  const { query, city, locality, propertyType, minPrice, maxPrice, minArea, maxArea, bedrooms, constructionStatus } = req.query;
 
   try {
-    const filters = {
-      $or: [
+    let filters = {};
+
+    // Keyword search (in city, locality, or propertyType)
+    if (query) {
+      filters.$or = [
         { city: { $regex: query, $options: "i" } },
         { locality: { $regex: query, $options: "i" } },
-        { propertyType: { $regex: propertyType, $options: "i" } }
-      ],
-    };
+        { propertyType: { $regex: query, $options: "i" } }
+      ];
+    }
+
+    // Exact matches
+    if (city) filters.city = { $regex: city, $options: "i" };
+    if (locality) filters.locality = { $regex: locality, $options: "i" };
+    if (propertyType) filters.propertyType = { $regex: propertyType, $options: "i" };
+    if (bedrooms) filters.bedrooms = Number(bedrooms);
+    if (constructionStatus) filters.availabilityStatus = constructionStatus;
+
+    // Range filters
+    if (minPrice || maxPrice) {
+      filters.price = {};
+      if (minPrice) filters.price.$gte = Number(minPrice);
+      if (maxPrice) filters.price.$lte = Number(maxPrice);
+    }
+
+    if (minArea || maxArea) {
+      filters.area = {};
+      if (minArea) filters.area.$gte = Number(minArea);
+      if (maxArea) filters.area.$lte = Number(maxArea);
+    }
 
     const results = await Property.find(filters)
       .populate("vendorId", "fname business_name vendorNumber")
-
       .exec();
 
     res.json(results);
   } catch (err) {
-    console.error(err);
+    console.error("Property search error:", err);
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.get('/getRecentlypropertyHome', async (req, res) => {
+  try {
+    const products = await Property.aggregate([
+      {
+        $match: {
+          active: true
+        }
+      },
+      {
+        $sort: {
+          createdAt: -1 // Descending order
+        }
+      },
+      {
+        $limit: 10
+      },
+      {
+        $lookup: {
+          from: 'vendor', // Must match actual collection name
+          let: { vendorId: { $toObjectId: "$vendorId" } },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $eq: ["$_id", "$$vendorId"]
+                }
+              }
+            }
+          ],
+          as: 'vendorDetails'
+        }
+      },
+      {
+        $unwind: {
+          path: '$vendorDetails',
+          preserveNullAndEmptyArrays: true
+        }
+      }
+    ]);
+
+    if (!products || products.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'No products found' });
+    }
+
+    res.json({ status: 'ok', data: products });
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    res.status(500).json({ status: 'error', message: 'Internal server error' });
+  }
+});
+
+app.get('/getReadyToMoveHome', async (req, res) => {
+  try {
+    const count = await Property.countDocuments({
+      active: true,
+      availabilityStatus: "Ready to move"
+    });
+
+    res.json({ count });
+  } catch (error) {
+    console.error('Error fetching property count:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+app.get('/getUnderConstructionHome', async (req, res) => {
+  try {
+    const count = await Property.countDocuments({
+      active: true,
+      availabilityStatus: "Under Construction"
+    });
+
+    res.json({ count });
+  } catch (error) {
+    console.error('Error fetching property count:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+app.get('/getBNKCount', async (req, res) => {
+  try {
+    const { bedrooms } = req.query;
+
+    if (!bedrooms) {
+      return res.status(400).json({ error: 'bedrooms query parameter is required' });
+    }
+
+    const count = await Property.countDocuments({
+      active: true,
+      bedrooms: parseInt(bedrooms)
+    });
+
+    res.json({ count });
+  } catch (error) {
+    console.error('Error fetching property count:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
